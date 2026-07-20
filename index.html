@@ -24,6 +24,16 @@
       <a href="#dimensions">The Practice</a>
       <a href="#pricing">Pricing</a>
       <a href="#about">About</a>
+      <button class="nav-signin" id="signInBtn">Sign in</button>
+      <div class="account-wrap">
+        <button class="account-btn hidden" id="accountBtn" aria-label="Account menu"><span id="accountInitial">?</span></button>
+        <div class="account-menu" id="accountMenu">
+          <div class="menu-email" id="menuEmail"></div>
+          <button type="button" id="menuBookings">My bookings</button>
+          <a href="admin.html" id="menuAdmin" class="hidden">Admin portal</a>
+          <button type="button" id="menuSignOut">Sign out</button>
+        </div>
+      </div>
       <button class="book-btn" data-book>Book Now</button>
     </div>
     <button class="nav-burger" id="burger" aria-label="Open menu" aria-expanded="false">
@@ -38,6 +48,8 @@
   <a href="#pricing">Pricing</a>
   <a href="#about">About</a>
   <a href="#contact">Contact</a>
+  <button type="button" class="mobile-signin hidden" id="mobileBookings">My bookings</button>
+  <button type="button" class="mobile-signin" id="mobileSignIn">Sign in</button>
   <button class="book-btn big" data-book>Book a Treatment</button>
 </div>
 
@@ -301,8 +313,34 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="authModal" aria-hidden="true">
+  <div class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-head">
+      <div>
+        <div class="modal-eyebrow">Te Aawhina Wellness</div>
+        <h3 id="authTitle">Your account</h3>
+      </div>
+      <button class="modal-close" id="authClose" aria-label="Close sign in">&times;</button>
+    </div>
+    <div class="modal-body" id="authBody"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="myModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="myTitle">
+    <div class="modal-head">
+      <div>
+        <div class="modal-eyebrow">Te Aawhina Wellness</div>
+        <h3 id="myTitle">My bookings</h3>
+      </div>
+      <button class="modal-close" id="myClose" aria-label="Close my bookings">&times;</button>
+    </div>
+    <div class="modal-body" id="myBody"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

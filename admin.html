@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Admin — Te Aawhina Wellness</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0c0a07">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .admin-shell{max-width:920px;margin:0 auto;padding:110px 24px 80px}
+  .admin-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:34px}
+  .admin-head h1{font-size:clamp(1.7rem,4vw,2.4rem)}
+  .admin-head .sub{color:var(--bone-dim);font-size:.9rem;margin-top:6px}
+  .admin-actions{display:flex;gap:12px;align-items:center}
+  .gate{max-width:420px;margin:150px auto 0;text-align:center;padding:0 24px}
+  .gate h1{font-size:1.9rem;margin-bottom:12px}
+  .gate p{color:var(--bone-dim);margin-bottom:26px}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:30px}
+  .stat{border:1px solid rgba(198,161,91,.18);border-radius:4px;padding:18px 20px;background:var(--ink-2)}
+  .stat .n{font-family:'Fraunces',serif;font-size:1.9rem;color:var(--gold-bright)}
+  .stat .l{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--bone-dim)}
+  .filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+  .filter-btn{
+    padding:9px 18px;font-size:.76rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    border:1px solid rgba(198,161,91,.25);border-radius:2px;color:var(--bone-dim);transition:all .2s;
+  }
+  .filter-btn.active{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+  .bk{border:1px solid rgba(198,161,91,.18);border-radius:4px;background:var(--ink-2);padding:20px 22px;margin-bottom:14px}
+  .bk.cancelled{opacity:.5}
+  .bk-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .bk-ref{font-size:.75rem;letter-spacing:.16em;color:var(--gold)}
+  .bk-status{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fern)}
+  .bk.cancelled .bk-status{color:#d99}
+  .bk-main{font-family:'Fraunces',serif;font-size:1.15rem;color:var(--bone)}
+  .bk-when{color:var(--gold-bright);font-size:.92rem;margin:2px 0 10px}
+  .bk-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px 20px;font-size:.86rem;color:var(--bone-dim)}
+  .bk-meta b{color:var(--bone);font-weight:500}
+  .bk-notes{margin-top:10px;font-size:.86rem;color:var(--bone-dim);border-left:2px solid var(--gold-dim);padding-left:12px}
+  .bk-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .bk-actions button{
+    padding:8px 16px;font-size:.74rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    border-radius:2px;border:1px solid rgba(198,161,91,.3);color:var(--bone-dim);transition:all .2s;
+  }
+  .bk-actions button:hover{border-color:var(--gold);color:var(--gold-bright)}
+  .bk-actions button.danger:hover{border-color:#c66;color:#e99}
+  .empty{color:var(--bone-dim);text-align:center;padding:60px 0}
+  .back-home{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--bone-dim)}
+  .back-home:hover{color:var(--gold-bright)}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <h1>Admin <em>Portal</em></h1>
+  <p id="gateMsg">Sign in with the admin account to continue.</p>
+  <button class="btn btn-gold" id="gateSignIn">Sign in with Google</button>
+  <p style="margin-top:22px"><a class="back-home" href="index.html">← Back to site</a></p>
+</div>
+
+<div id="portal" class="admin-shell" style="display:none">
+  <div class="admin-head">
+    <div>
+      <div class="eyebrow">Te Aawhina Wellness</div>
+      <h1>Bookings</h1>
+      <div class="sub" id="whoami"></div>
+    </div>
+    <div class="admin-actions">
+      <a class="back-home" href="index.html">← Site</a>
+      <button class="btn btn-line slim" id="refreshBtn">Refresh</button>
+      <button class="btn btn-line slim" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat"><div class="n" id="statUpcoming">–</div><div class="l">Upcoming</div></div>
+    <div class="stat"><div class="n" id="statToday">–</div><div class="l">Today</div></div>
+    <div class="stat"><div class="n" id="statTotal">–</div><div class="l">All time</div></div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" data-filter="upcoming">Upcoming</button>
+    <button class="filter-btn" data-filter="past">Past</button>
+    <button class="filter-btn" data-filter="cancelled">Cancelled</button>
+    <button class="filter-btn" data-filter="all">All</button>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>

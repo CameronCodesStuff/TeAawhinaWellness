@@ -1,5 +1,9 @@
-(function(){
-"use strict";
+import {
+  auth, db, googleProvider, isAdminUser, slotId, SMS_ENDPOINT,
+  signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendPasswordResetEmail, onAuthStateChanged, signOut,
+  collection, doc, getDocs, query, where, writeBatch, serverTimestamp
+} from "./firebase.js";
 
 const $=(s,c=document)=>c.querySelector(s);
 const $$=(s,c=document)=>[...c.querySelectorAll(s)];
@@ -12,7 +16,6 @@ const TREATMENTS={
 const OPEN_DAYS=[2,3,4,5,6];
 const SLOT_TIMES=["9:00 am","10:15 am","11:30 am","12:45 pm","2:00 pm","3:15 pm"];
 const BOOK_AHEAD_DAYS=60;
-const STORE_KEY="taw_bookings_v1";
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
@@ -25,33 +28,13 @@ const state={
   calYear:0,
   calMonth:0,
   details:{name:"",phone:"",email:"",firstVisit:false,notes:""},
-  confirmed:null
+  confirmed:null,
+  saving:false
 };
 
-function loadBookings(){
-  try{return JSON.parse(localStorage.getItem(STORE_KEY))||[]}catch(e){return[]}
-}
-function saveBooking(b){
-  const all=loadBookings();
-  all.push(b);
-  try{localStorage.setItem(STORE_KEY,JSON.stringify(all))}catch(e){}
-}
-function isBooked(dateKey,time){
-  return loadBookings().some(b=>b.date===dateKey&&b.time===time);
-}
+let currentUser=null;
 
-function seedRand(str){
-  let h=2166136261;
-  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}
-  return()=>{
-    h+=h<<13;h^=h>>>7;h+=h<<3;h^=h>>>17;h+=h<<5;
-    return((h>>>0)%1000)/1000;
-  };
-}
-function slotAvailability(dateKey){
-  const rnd=seedRand(dateKey);
-  return SLOT_TIMES.map(t=>({time:t,taken:rnd()<0.3||isBooked(dateKey,t)}));
-}
+/* ---------------- helpers ---------------- */
 
 function dateKey(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`}
 function prettyDate(key){
@@ -61,6 +44,30 @@ function prettyDate(key){
   return `${wd} ${d} ${MONTHS[m-1]} ${y}`;
 }
 function startOfToday(){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate())}
+function esc(s){
+  return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function friendlyAuthError(e){
+  const code=(e&&e.code)||"";
+  if(code.includes("invalid-credential")||code.includes("wrong-password")||code.includes("user-not-found"))return "Email or password is incorrect.";
+  if(code.includes("email-already-in-use"))return "An account with that email already exists — try signing in.";
+  if(code.includes("weak-password"))return "Password needs to be at least 6 characters.";
+  if(code.includes("invalid-email"))return "That email doesn't look right.";
+  if(code.includes("popup-closed"))return "Sign-in was cancelled.";
+  if(code.includes("too-many-requests"))return "Too many attempts — please wait a moment.";
+  return "Something went wrong — please try again.";
+}
+
+/* ---------------- Firestore: slots ---------------- */
+
+async function fetchTakenTimes(dKey){
+  const snap=await getDocs(query(collection(db,"slots"),where("date","==",dKey)));
+  const taken=new Set();
+  snap.forEach(d=>taken.add(d.data().time));
+  return taken;
+}
+
+/* ---------------- booking modal ---------------- */
 
 const modal=$("#bookingModal");
 const modalBody=$("#modalBody");
@@ -77,8 +84,13 @@ function openModal(preDuration){
   Object.assign(state,{
     step:0,duration:null,price:null,date:null,time:null,
     calYear:today.getFullYear(),calMonth:today.getMonth(),
-    details:{name:"",phone:"",email:"",firstVisit:false,notes:""},
-    confirmed:null
+    details:{
+      name:currentUser?.displayName||"",
+      phone:"",
+      email:currentUser?.email||"",
+      firstVisit:false,notes:""
+    },
+    confirmed:null,saving:false
   });
   if(preDuration&&TREATMENTS[preDuration]){
     state.duration=preDuration;
@@ -119,7 +131,7 @@ function render(){
     nextBtn.disabled=false;
     renderConfirmed();
   }else{
-    nextBtn.textContent=state.step===4?"Confirm Booking":"Continue";
+    nextBtn.textContent=state.step===4?(state.saving?"Booking…":"Confirm Booking"):"Continue";
     [renderTreatment,renderDate,renderTime,renderDetails,renderReview][state.step]();
     updateNextState();
   }
@@ -132,6 +144,7 @@ function updateNextState(){
   if(state.step===1)ok=!!state.date;
   if(state.step===2)ok=!!state.time;
   if(state.step===3)ok=detailsValid(false);
+  if(state.saving)ok=false;
   nextBtn.disabled=!ok;
 }
 
@@ -229,8 +242,23 @@ function renderDate(){
   }));
 }
 
-function renderTime(){
-  const slots=slotAvailability(state.date);
+async function renderTime(){
+  modalBody.innerHTML=`
+    <div class="step-title">Choose a time</div>
+    <div class="slot-date">${prettyDate(state.date)}</div>
+    <div class="slot-loading">Checking availability…</div>`;
+  let taken;
+  try{
+    taken=await fetchTakenTimes(state.date);
+  }catch(e){
+    modalBody.innerHTML=`
+      <div class="step-title">Choose a time</div>
+      <div class="slot-date">${prettyDate(state.date)}</div>
+      <div class="slot-empty">Couldn't load availability — check your connection and try again.</div>`;
+    return;
+  }
+  if(state.step!==2)return; // user navigated away while loading
+  const slots=SLOT_TIMES.map(t=>({time:t,taken:taken.has(t)}));
   const anyFree=slots.some(s=>!s.taken);
   const grid=anyFree?`<div class="slot-grid">${slots.map(s=>`
     <button type="button" class="slot${s.taken?" taken":""}${state.time===s.time?" selected":""}" data-time="${s.time}" ${s.taken?"disabled":""}>${s.time}</button>`).join("")}</div>`
@@ -241,7 +269,7 @@ function renderTime(){
     ${grid}`;
   $$(".slot:not(.taken)",modalBody).forEach(btn=>btn.addEventListener("click",()=>{
     state.time=btn.dataset.time;
-    renderTime();
+    $$(".slot",modalBody).forEach(b=>b.classList.toggle("selected",b.dataset.time===state.time));
     updateNextState();
   }));
 }
@@ -277,7 +305,7 @@ function renderDetails(){
       </div>
       <div class="field">
         <label for="fPhone">Phone <b>*</b></label>
-        <input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(d.phone)}" placeholder="0275 212 949">
+        <input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(d.phone)}" placeholder="027 123 4567">
         <div class="field-err">Please enter a valid phone number.</div>
       </div>
       <div class="field">
@@ -293,6 +321,7 @@ function renderDetails(){
         <label for="fNotes">Anything you'd like me to know?</label>
         <textarea id="fNotes" placeholder="Injuries, areas of focus, accessibility needs…">${esc(d.notes)}</textarea>
       </div>
+      ${currentUser?"":`<div class="signin-hint">Tip — <button type="button" class="link-btn" id="hintSignIn">sign in</button> to keep track of your bookings.</div>`}
     </div>`;
   const bind=(id,key)=>$("#"+id,modalBody).addEventListener("input",e=>{
     state.details[key]=e.target.value;
@@ -303,6 +332,8 @@ function renderDetails(){
     state.details.firstVisit=!state.details.firstVisit;
     e.currentTarget.classList.toggle("on",state.details.firstVisit);
   });
+  const hint=$("#hintSignIn",modalBody);
+  if(hint)hint.addEventListener("click",()=>{closeModal();openAuth();});
 }
 
 function renderReview(){
@@ -333,13 +364,19 @@ function renderConfirmed(){
       </svg>
       <h4>Booking confirmed</h4>
       <div class="ref">${b.ref}</div>
-      <p>${b.treatment} · ${prettyDate(b.date)} · ${b.time}</p>
-      <p>You'll receive a text confirmation and a reminder the day before. To change or cancel, txt 0275 212 949.</p>
-      <div class="demo-tag">Demo mode — no real appointment was created</div>
+      <p>${esc(b.treatment)} · ${prettyDate(b.date)} · ${b.time}</p>
+      <p>A text confirmation is on its way to your phone. To change or cancel, txt 0275 212 949.</p>
     </div>`;
 }
 
-function confirmBooking(){
+/* ---------------- confirm: Firestore + SMS ---------------- */
+
+async function confirmBooking(){
+  if(state.saving)return;
+  state.saving=true;
+  nextBtn.disabled=true;
+  nextBtn.textContent="Booking…";
+
   const t=TREATMENTS[state.duration];
   const ref="TAW-"+Math.random().toString(36).slice(2,6).toUpperCase()+"-"+String(Math.floor(Math.random()*900)+100);
   const booking={
@@ -349,10 +386,49 @@ function confirmBooking(){
     price:state.price,
     date:state.date,
     time:state.time,
-    ...state.details,
-    createdAt:new Date().toISOString()
+    name:state.details.name.trim(),
+    phone:state.details.phone.trim(),
+    email:state.details.email.trim(),
+    firstVisit:state.details.firstVisit,
+    notes:state.details.notes.trim(),
+    uid:currentUser?currentUser.uid:null,
+    status:"confirmed",
+    createdAt:serverTimestamp()
   };
-  saveBooking(booking);
+
+  try{
+    const batch=writeBatch(db);
+    // Creating the slot doc reserves the time — the batch fails if it already exists,
+    // so two people can never book the same slot.
+    const slotRef=doc(db,"slots",slotId(state.date,state.time));
+    batch.set(slotRef,{date:state.date,time:state.time,createdAt:serverTimestamp()});
+    batch.set(doc(collection(db,"bookings")),booking);
+    await batch.commit();
+  }catch(e){
+    state.saving=false;
+    showToast("That time was just taken — please pick another.");
+    state.step=2;
+    state.time=null;
+    render();
+    return;
+  }
+
+  // Fire the SMS worker — booking is already saved, so don't block on this.
+  fetch(SMS_ENDPOINT,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      ref,
+      treatment:t.label,
+      date:prettyDate(state.date),
+      time:state.time,
+      price:state.price,
+      name:booking.name,
+      phone:booking.phone
+    })
+  }).catch(()=>{});
+
+  state.saving=false;
   state.confirmed=booking;
   render();
   showToast("Booking "+ref+" confirmed ✦");
@@ -366,19 +442,201 @@ nextBtn.addEventListener("click",()=>{
   render();
 });
 backBtn.addEventListener("click",()=>{
-  if(state.step>0&&!state.confirmed){state.step--;render()}
+  if(state.step>0&&!state.confirmed&&!state.saving){state.step--;render()}
 });
 $("#modalClose").addEventListener("click",closeModal);
 modal.addEventListener("click",e=>{if(e.target===modal)closeModal()});
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"&&modal.classList.contains("open"))closeModal();
-});
 
 $$("[data-book]").forEach(btn=>btn.addEventListener("click",()=>openModal(btn.dataset.duration)));
 
-function esc(s){
-  return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* ---------------- auth modal ---------------- */
+
+const authModal=$("#authModal");
+const authBody=$("#authBody");
+let authMode="signin";
+
+function openAuth(){
+  authMode="signin";
+  renderAuth();
+  authModal.classList.add("open");
+  authModal.setAttribute("aria-hidden","false");
+  document.body.classList.add("locked");
+  closeMenu();
 }
+function closeAuth(){
+  authModal.classList.remove("open");
+  authModal.setAttribute("aria-hidden","true");
+  if(!modal.classList.contains("open"))document.body.classList.remove("locked");
+}
+
+function renderAuth(msg,isErr){
+  const signin=authMode==="signin";
+  authBody.innerHTML=`
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab${signin?" active":""}" data-mode="signin">Sign in</button>
+      <button type="button" class="auth-tab${!signin?" active":""}" data-mode="signup">Create account</button>
+    </div>
+    <button type="button" class="google-btn" id="googleBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M12 5.04c1.68 0 3.19.58 4.38 1.71l3.27-3.27C17.66 1.6 15.05.5 12 .5 7.31.5 3.26 3.19 1.28 7.12l3.81 2.96C6.02 7.24 8.77 5.04 12 5.04z"/><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.46H12v4.65h6.45c-.28 1.5-1.12 2.77-2.39 3.62l3.69 2.87c2.16-2 3.75-4.94 3.75-8.68z"/><path fill="#FBBC05" d="M5.09 14.09A7.03 7.03 0 0 1 4.72 12c0-.73.13-1.43.36-2.09L1.28 6.95A11.48 11.48 0 0 0 .5 12c0 1.85.44 3.6 1.22 5.15l3.37-3.06z"/><path fill="#34A853" d="M12 23.5c3.1 0 5.71-1.02 7.61-2.78l-3.69-2.87c-1.02.69-2.34 1.1-3.92 1.1-3.23 0-5.98-2.18-6.96-5.12l-3.76 3.06C3.26 20.81 7.31 23.5 12 23.5z"/></svg>
+      Continue with Google
+    </button>
+    <div class="auth-or"><span>or with email</span></div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="aEmail">Email</label>
+        <input id="aEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="aPass">Password</label>
+        <input id="aPass" type="password" autocomplete="${signin?"current-password":"new-password"}" placeholder="${signin?"Your password":"At least 6 characters"}">
+      </div>
+    </div>
+    ${msg?`<div class="auth-msg${isErr?" err":""}">${esc(msg)}</div>`:""}
+    <button type="button" class="btn btn-gold auth-submit" id="authSubmit">${signin?"Sign in":"Create account"}</button>
+    ${signin?`<button type="button" class="link-btn auth-forgot" id="forgotBtn">Forgot password?</button>`:""}
+  `;
+  $$(".auth-tab",authBody).forEach(b=>b.addEventListener("click",()=>{
+    authMode=b.dataset.mode;
+    renderAuth();
+  }));
+  $("#googleBtn",authBody).addEventListener("click",async()=>{
+    try{
+      await signInWithPopup(auth,googleProvider);
+      closeAuth();
+      showToast("Kia ora — you're signed in ✦");
+    }catch(e){renderAuth(friendlyAuthError(e),true)}
+  });
+  const submit=async()=>{
+    const email=$("#aEmail",authBody).value.trim();
+    const pass=$("#aPass",authBody).value;
+    if(!email||!pass){renderAuth("Please enter your email and password.",true);return}
+    try{
+      if(authMode==="signin")await signInWithEmailAndPassword(auth,email,pass);
+      else await createUserWithEmailAndPassword(auth,email,pass);
+      closeAuth();
+      showToast("Kia ora — you're signed in ✦");
+    }catch(e){renderAuth(friendlyAuthError(e),true)}
+  };
+  $("#authSubmit",authBody).addEventListener("click",submit);
+  $("#aPass",authBody).addEventListener("keydown",e=>{if(e.key==="Enter")submit()});
+  const forgot=$("#forgotBtn",authBody);
+  if(forgot)forgot.addEventListener("click",async()=>{
+    const email=$("#aEmail",authBody).value.trim();
+    if(!email){renderAuth("Enter your email first, then tap forgot password.",true);return}
+    try{
+      await sendPasswordResetEmail(auth,email);
+      renderAuth("Password reset email sent — check your inbox.");
+    }catch(e){renderAuth(friendlyAuthError(e),true)}
+  });
+}
+
+$("#authClose").addEventListener("click",closeAuth);
+authModal.addEventListener("click",e=>{if(e.target===authModal)closeAuth()});
+
+/* ---------------- account menu ---------------- */
+
+const accountBtn=$("#accountBtn");
+const accountMenu=$("#accountMenu");
+const signInBtn=$("#signInBtn");
+const mobileSignIn=$("#mobileSignIn");
+
+function updateAuthUI(){
+  const signedIn=!!currentUser;
+  signInBtn.classList.toggle("hidden",signedIn);
+  mobileSignIn.textContent=signedIn?"Sign out":"Sign in";
+  $("#mobileBookings").classList.toggle("hidden",!signedIn);
+  accountBtn.classList.toggle("hidden",!signedIn);
+  if(signedIn){
+    const initial=(currentUser.displayName||currentUser.email||"?").trim()[0].toUpperCase();
+    $("#accountInitial").textContent=initial;
+    $("#menuEmail").textContent=currentUser.email||"";
+    $("#menuAdmin").classList.toggle("hidden",!isAdminUser(currentUser));
+  }else{
+    accountMenu.classList.remove("open");
+  }
+}
+
+accountBtn.addEventListener("click",e=>{
+  e.stopPropagation();
+  accountMenu.classList.toggle("open");
+});
+document.addEventListener("click",e=>{
+  if(!accountMenu.contains(e.target))accountMenu.classList.remove("open");
+});
+signInBtn.addEventListener("click",openAuth);
+mobileSignIn.addEventListener("click",()=>{
+  closeMenu();
+  if(currentUser)signOut(auth);
+  else openAuth();
+});
+$("#menuSignOut").addEventListener("click",async()=>{
+  accountMenu.classList.remove("open");
+  await signOut(auth);
+  showToast("Signed out");
+});
+$("#menuBookings").addEventListener("click",()=>{
+  accountMenu.classList.remove("open");
+  openMy();
+});
+$("#mobileBookings").addEventListener("click",()=>{
+  closeMenu();
+  openMy();
+});
+
+onAuthStateChanged(auth,user=>{
+  currentUser=user;
+  updateAuthUI();
+});
+
+/* ---------------- my bookings ---------------- */
+
+const myModal=$("#myModal");
+const myBody=$("#myBody");
+
+async function openMy(){
+  if(!currentUser)return;
+  myModal.classList.add("open");
+  myModal.setAttribute("aria-hidden","false");
+  document.body.classList.add("locked");
+  myBody.innerHTML=`<div class="slot-loading">Loading your bookings…</div>`;
+  try{
+    const snap=await getDocs(query(
+      collection(db,"bookings"),
+      where("uid","==",currentUser.uid)
+    ));
+    const items=[];
+    snap.forEach(d=>items.push(d.data()));
+    items.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    if(!items.length){
+      myBody.innerHTML=`<div class="slot-empty">No bookings yet — when you book while signed in, they'll show here.</div>`;
+      return;
+    }
+    myBody.innerHTML=items.map(b=>`
+      <div class="my-booking${b.status==="cancelled"?" cancelled":""}">
+        <div class="mb-top"><span class="mb-ref">${esc(b.ref)}</span><span class="mb-status">${esc(b.status)}</span></div>
+        <div class="mb-main">${esc(b.treatment)}</div>
+        <div class="mb-when">${prettyDate(b.date)} · ${esc(b.time)}</div>
+      </div>`).join("");
+  }catch(e){
+    myBody.innerHTML=`<div class="slot-empty">Couldn't load bookings — please try again.</div>`;
+  }
+}
+function closeMy(){
+  myModal.classList.remove("open");
+  myModal.setAttribute("aria-hidden","true");
+  if(!modal.classList.contains("open"))document.body.classList.remove("locked");
+}
+$("#myClose").addEventListener("click",closeMy);
+myModal.addEventListener("click",e=>{if(e.target===myModal)closeMy()});
+
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  if(authModal.classList.contains("open")){closeAuth();return}
+  if(myModal.classList.contains("open")){closeMy();return}
+  if(modal.classList.contains("open"))closeModal();
+});
+
+/* ---------------- nav / decoration ---------------- */
 
 const burger=$("#burger");
 const mobileMenu=$("#mobileMenu");
@@ -386,7 +644,7 @@ function closeMenu(){
   burger.classList.remove("open");
   burger.setAttribute("aria-expanded","false");
   mobileMenu.classList.remove("open");
-  if(!modal.classList.contains("open"))document.body.classList.remove("locked");
+  if(!modal.classList.contains("open")&&!authModal.classList.contains("open"))document.body.classList.remove("locked");
 }
 burger.addEventListener("click",()=>{
   const open=!mobileMenu.classList.contains("open");
@@ -414,5 +672,3 @@ const obs=new IntersectionObserver(es=>{
   });
 },{threshold:.12});
 $$(".reveal").forEach(el=>obs.observe(el));
-
-})();

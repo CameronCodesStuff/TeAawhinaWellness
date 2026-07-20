@@ -631,3 +631,88 @@ input[type=range]::-moz-range-thumb{
   .hero-koru path,.confirm-koru path{stroke-dashoffset:0}
   .reveal{opacity:1;transform:none}
 }
+
+/* ---------- auth & account (added) ---------- */
+.hidden{display:none!important}
+.nav-signin{
+  font-size:.78rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--bone-dim);transition:color .25s;padding:6px 2px;
+}
+.nav-signin:hover{color:var(--gold-bright)}
+.account-wrap{position:relative}
+.account-btn{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--pounamu-deep);border:1px solid var(--gold-dim);
+  color:var(--gold-bright);font-family:'Fraunces',serif;font-size:.95rem;
+  display:flex;align-items:center;justify-content:center;transition:border-color .25s;
+}
+.account-btn:hover{border-color:var(--gold)}
+.account-menu{
+  position:absolute;top:calc(100% + 12px);right:0;min-width:200px;
+  background:var(--ink-2);border:1px solid rgba(198,161,91,.22);border-radius:4px;
+  padding:8px;display:none;flex-direction:column;gap:2px;
+  box-shadow:0 18px 40px rgba(0,0,0,.5);z-index:70;
+}
+.account-menu.open{display:flex}
+.menu-email{
+  font-size:.72rem;color:var(--bone-dim);padding:8px 10px 10px;
+  border-bottom:1px solid rgba(198,161,91,.14);margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.account-menu button,.account-menu a{
+  text-align:left;font-size:.85rem;color:var(--bone);padding:9px 10px;border-radius:3px;
+  transition:background .2s,color .2s;display:block;
+}
+.account-menu button:hover,.account-menu a:hover{background:rgba(198,161,91,.1);color:var(--gold-bright)}
+.mobile-signin{
+  font-size:.95rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold);padding:12px 0;
+}
+.auth-modal{max-width:420px}
+.auth-tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid rgba(198,161,91,.16)}
+.auth-tab{
+  flex:1;padding:12px 6px;font-size:.8rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--bone-dim);border-bottom:2px solid transparent;transition:color .2s,border-color .2s;
+}
+.auth-tab.active{color:var(--gold-bright);border-bottom-color:var(--gold)}
+.google-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:11px;
+  padding:13px;border:1px solid rgba(198,161,91,.3);border-radius:3px;
+  font-size:.88rem;font-weight:500;color:var(--bone);transition:border-color .25s,background .25s;
+}
+.google-btn:hover{border-color:var(--gold);background:rgba(198,161,91,.06)}
+.auth-or{
+  display:flex;align-items:center;gap:14px;margin:20px 0;
+  font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--bone-dim);
+}
+.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:rgba(198,161,91,.16)}
+.auth-msg{
+  margin-top:14px;font-size:.85rem;color:var(--fern);
+  padding:10px 14px;background:rgba(125,150,120,.08);border-radius:3px;
+}
+.auth-msg.err{color:#d99;background:rgba(200,80,80,.08)}
+.auth-submit{width:100%;margin-top:18px;justify-content:center;display:flex}
+.auth-forgot{margin:14px auto 0;display:block}
+.link-btn{
+  color:var(--gold-bright);font-size:inherit;text-decoration:underline;
+  text-underline-offset:3px;padding:0;
+}
+.signin-hint{font-size:.82rem;color:var(--bone-dim)}
+.slot-loading{
+  text-align:center;padding:40px 0;color:var(--bone-dim);font-size:.9rem;
+}
+.my-booking{
+  border:1px solid rgba(198,161,91,.18);border-radius:4px;padding:16px 18px;margin-bottom:12px;
+}
+.my-booking.cancelled{opacity:.55}
+.mb-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.mb-ref{font-size:.75rem;letter-spacing:.14em;color:var(--gold)}
+.mb-status{
+  font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--fern);
+}
+.my-booking.cancelled .mb-status{color:#d99}
+.mb-main{font-family:'Fraunces',serif;font-size:1.05rem;color:var(--bone)}
+.mb-when{font-size:.85rem;color:var(--bone-dim)}
+@media(max-width:880px){
+  .nav-signin,.account-wrap{display:none}
+}
