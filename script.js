@@ -424,7 +424,8 @@ async function confirmBooking(){
       time:state.time,
       price:state.price,
       name:booking.name,
-      phone:booking.phone
+      phone:booking.phone,
+      email:booking.email
     })
   }).then(r=>r.json())
     .then(d=>console.log("SMS worker:",d))
