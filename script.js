@@ -426,7 +426,9 @@ async function confirmBooking(){
       name:booking.name,
       phone:booking.phone
     })
-  }).catch(()=>{});
+  }).then(r=>r.json())
+    .then(d=>console.log("SMS worker:",d))
+    .catch(e=>console.warn("SMS worker unreachable:",e));
 
   state.saving=false;
   state.confirmed=booking;
