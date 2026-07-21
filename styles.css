@@ -118,10 +118,14 @@ header{
 }
 .hero-koru path{
   fill:none;stroke:var(--gold);stroke-width:1.4;
-  stroke-dasharray:1243;stroke-dashoffset:1243;
+  stroke-dasharray:1099;stroke-dashoffset:1099;
   animation:draw 4.2s cubic-bezier(.4,0,.2,1) .3s forwards;
 }
-.hero-koru .inner{stroke:var(--fern);stroke-width:1;animation-delay:.9s;animation-duration:4.6s;stroke-dasharray:517;stroke-dashoffset:517}
+.hero-koru .inner{stroke:var(--fern);stroke-width:1;animation-delay:.9s;animation-duration:4.6s;stroke-dasharray:460;stroke-dashoffset:460}
+.hero-koru .tip{fill:var(--gold);opacity:0;animation:tipIn .8s ease forwards}
+.hero-koru .tip-main{animation-delay:3.9s}
+.hero-koru .tip-inner{fill:var(--fern);animation-delay:4.9s}
+@keyframes tipIn{to{opacity:1}}
 @keyframes draw{to{stroke-dashoffset:0}}
 .hero-content{position:relative;z-index:2;max-width:640px}
 .hero-content .eyebrow{margin-bottom:26px}
@@ -540,9 +544,10 @@ input[type=range]::-moz-range-thumb{
 .confirm-koru{width:74px;height:74px;margin:0 auto 22px}
 .confirm-koru path{
   fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;
-  stroke-dasharray:164;stroke-dashoffset:164;
+  stroke-dasharray:148;stroke-dashoffset:148;
   animation:draw 1.6s cubic-bezier(.4,0,.2,1) .2s forwards;
 }
+.confirm-koru .tip{fill:var(--gold);opacity:0;animation:tipIn .5s ease 1.5s forwards}
 .confirm-wrap h4{
   font-family:'Fraunces',serif;font-size:1.7rem;font-weight:300;margin-bottom:8px;
 }
@@ -629,6 +634,7 @@ input[type=range]::-moz-range-thumb{
   *{animation:none!important;transition:none!important}
   html{scroll-behavior:auto}
   .hero-koru path,.confirm-koru path{stroke-dashoffset:0}
+  .hero-koru .tip,.confirm-koru .tip{opacity:1;animation:none}
   .reveal{opacity:1;transform:none}
 }
 
