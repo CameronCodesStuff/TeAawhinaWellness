@@ -2,7 +2,7 @@ import {
   auth, db, googleProvider, isAdminUser, slotId, SMS_ENDPOINT,
   signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, onAuthStateChanged, signOut,
-  collection, doc, getDocs, query, where, writeBatch, serverTimestamp
+  collection, doc, setDoc, getDocs, query, where, writeBatch, serverTimestamp
 } from "./firebase.js";
 
 const $=(s,c=document)=>c.querySelector(s);
@@ -131,7 +131,7 @@ function render(){
     nextBtn.disabled=false;
     renderConfirmed();
   }else{
-    nextBtn.textContent=state.step===4?(state.saving?"Booking…":"Confirm Booking"):"Continue";
+    nextBtn.textContent=state.step===4?(state.saving?"Sending…":"Request Booking"):"Continue";
     [renderTreatment,renderDate,renderTime,renderDetails,renderReview][state.step]();
     updateNextState();
   }
@@ -278,7 +278,7 @@ function detailsValid(mark){
   const d=state.details;
   const nameOk=d.name.trim().length>=2;
   const phoneOk=/^[\d\s+()-]{7,}$/.test(d.phone.trim());
-  const emailOk=d.email.trim()===""||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim());
+  const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim());
   if(mark){
     markErr("fName",!nameOk);
     markErr("fPhone",!phoneOk);
@@ -309,9 +309,9 @@ function renderDetails(){
         <div class="field-err">Please enter a valid phone number.</div>
       </div>
       <div class="field">
-        <label for="fEmail">Email</label>
+        <label for="fEmail">Email <b>*</b></label>
         <input id="fEmail" type="email" inputmode="email" autocomplete="email" value="${esc(d.email)}" placeholder="you@example.com">
-        <div class="field-err">That email doesn't look right.</div>
+        <div class="field-err">We need a valid email to confirm your booking.</div>
       </div>
       <button type="button" class="check-row${d.firstVisit?" on":""}" id="fFirst">
         <span class="box"></span>
@@ -352,7 +352,7 @@ function renderReview(){
       ${d.firstVisit?`<div class="review-row"><span class="rk">Note</span><span class="rv">First visit</span></div>`:""}
       ${d.notes?`<div class="review-row"><span class="rk">Notes</span><span class="rv">${esc(d.notes)}</span></div>`:""}
     </div>
-    <div class="review-note">Payment is made at your appointment. Treatments are provided fully clothed.</div>`;
+    <div class="review-note">Your booking will be confirmed by email once approved. Payment is made at your appointment; treatments are provided fully clothed.</div>`;
 }
 
 function renderConfirmed(){
@@ -360,12 +360,12 @@ function renderConfirmed(){
   modalBody.innerHTML=`
     <div class="confirm-wrap">
       <svg class="confirm-koru" viewBox="0 0 80 80" fill="none">
-        <path d="M15.3 8.0L15.5 10.0L15.7 12.0L15.9 14.0L16.1 16.1L16.4 18.1L16.7 20.1L17.0 22.1L17.3 24.1L17.6 26.1L18.0 28.1L18.4 30.1L18.8 32.0L19.2 34.0L19.7 36.0L20.2 37.9L20.8 39.9L21.4 41.8L22.1 43.7L22.7 45.6L23.5 47.5L24.3 49.4L25.1 51.2L26.1 53.0L27.0 54.8L28.1 56.5L29.2 58.2L30.4 59.9L31.6 61.5L33.0 63.0L34.4 64.4L35.9 65.8L37.5 67.1L39.1 68.2L40.9 69.2L42.7 70.1L44.6 70.9L46.5 71.4L48.5 71.8L50.5 72.0L52.6 71.9L54.6 71.6L56.5 71.1L58.4 70.3L60.1 69.2L61.6 67.9L62.9 66.3L63.9 64.6L64.5 62.6L64.7 60.6L64.4 58.6L63.7 56.7L62.5 55.1L60.9 53.9L59.0 53.2L57.0 53.1L55.1 53.7L53.5 55.0L52.6 56.8L52.5 58.8L53.3 60.7L54.9 61.9L56.9 62.1L58.7 61.3L59.6 59.5L59.3 57.6L57.8 56.3L57.0 56.1"/>
+        <path d="M11.9 8.0L12.1 9.2L12.3 10.5L12.4 11.7L12.6 13.0L12.8 14.2L13.0 15.5L13.2 16.7L13.4 17.9L13.6 19.2L13.8 20.4L14.1 21.7L14.3 22.9L14.6 24.1L14.8 25.3L15.1 26.6L15.4 27.8L15.7 29.0L16.0 30.2L16.3 31.5L16.6 32.7L17.0 33.9L17.3 35.1L17.7 36.3L18.1 37.5L18.5 38.7L18.9 39.9L19.3 41.0L19.8 42.2L20.2 43.4L20.7 44.5L21.2 45.7L21.7 46.8L22.3 48.0L22.8 49.1L23.4 50.2L24.0 51.3L24.6 52.4L25.3 53.5L25.9 54.5L26.6 55.6L27.3 56.6L28.1 57.6L28.9 58.6L29.6 59.6L30.5 60.6L31.3 61.5L32.2 62.4L33.1 63.3L34.0 64.2L34.9 65.0L35.9 65.8L36.9 66.5L37.9 67.2L39.0 67.9L40.1 68.6L41.2 69.2L42.3 69.7L43.5 70.2L44.6 70.6L45.8 71.0L47.1 71.4L48.3 71.6L49.5 71.8L50.8 71.9L52.0 72.0L53.3 72.0L54.5 71.9L55.8 71.7L57.0 71.4L58.2 71.1L59.4 70.7L60.5 70.1L61.6 69.5L62.7 68.8L63.7 68.1L64.6 67.2L65.4 66.2L66.1 65.2L66.8 64.1L67.3 63.0L67.7 61.8L67.9 60.6L68.1 59.3L68.0 58.1L67.8 56.8L67.5 55.6L67.0 54.5L66.3 53.4L65.5 52.4L64.6 51.6L63.5 50.9L62.4 50.4L61.1 50.2L59.9 50.1L58.6 50.2L57.4 50.6L56.3 51.2L55.4 52.0L54.6 53.0L54.1 54.2L53.9 55.4L53.9 56.7L54.3 57.9L54.9 58.9L55.8 59.8L57.0 60.4L58.2 60.6L59.4 60.5L60.6 60.0L61.5 59.1L62.1 58.0L62.3 56.8L62.0 55.6L61.3 54.5L60.3 53.9L59.0 53.6"/>
       </svg>
-      <h4>Booking confirmed</h4>
+      <h4>Booking received</h4>
       <div class="ref">${b.ref}</div>
       <p>${esc(b.treatment)} · ${prettyDate(b.date)} · ${b.time}</p>
-      <p>A text confirmation is on its way to your phone. To change or cancel, txt 0275 212 949.</p>
+      <p>Your time is reserved and awaiting confirmation — we've emailed ${esc(b.email)} and will email again once it's approved.</p>
     </div>`;
 }
 
@@ -392,7 +392,7 @@ async function confirmBooking(){
     firstVisit:state.details.firstVisit,
     notes:state.details.notes.trim(),
     uid:currentUser?currentUser.uid:null,
-    status:"confirmed",
+    status:"pending",
     createdAt:serverTimestamp()
   };
 
@@ -431,10 +431,18 @@ async function confirmBooking(){
     .then(d=>console.log("SMS worker:",d))
     .catch(e=>console.warn("SMS worker unreachable:",e));
 
+  if(currentUser){
+    setDoc(doc(db,"users",currentUser.uid),{
+      name:booking.name,
+      phone:booking.phone,
+      updatedAt:serverTimestamp()
+    },{merge:true}).catch(()=>{});
+  }
+
   state.saving=false;
   state.confirmed=booking;
   render();
-  showToast("Booking "+ref+" confirmed ✦");
+  showToast("Booking "+ref+" requested ✦");
 }
 
 nextBtn.addEventListener("click",()=>{
@@ -589,6 +597,13 @@ $("#mobileBookings").addEventListener("click",()=>{
 onAuthStateChanged(auth,user=>{
   currentUser=user;
   updateAuthUI();
+  if(user){
+    setDoc(doc(db,"users",user.uid),{
+      name:user.displayName||"",
+      email:user.email||"",
+      updatedAt:serverTimestamp()
+    },{merge:true}).catch(()=>{});
+  }
 });
 
 /* ---------------- my bookings ---------------- */
@@ -615,7 +630,7 @@ async function openMy(){
       return;
     }
     myBody.innerHTML=items.map(b=>`
-      <div class="my-booking${b.status==="cancelled"?" cancelled":""}">
+      <div class="my-booking${(b.status==="cancelled"||b.status==="denied")?" cancelled":""}">
         <div class="mb-top"><span class="mb-ref">${esc(b.ref)}</span><span class="mb-status">${esc(b.status)}</span></div>
         <div class="mb-main">${esc(b.treatment)}</div>
         <div class="mb-when">${prettyDate(b.date)} · ${esc(b.time)}</div>

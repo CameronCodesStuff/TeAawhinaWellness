@@ -39,9 +39,9 @@ const firebaseConfig = {
   measurementId: "G-8BYCSZ2NEB"
 };
 
-// The only account that can access the admin portal.
-// Must also match the email in firestore.rules.
-export const ADMIN_EMAIL = "detlaffcameron@gmail.com";
+// Accounts that can access the admin portal and receive booking alerts.
+// Must match the admin list in firestore.rules and in the worker.
+export const ADMIN_EMAILS = ["detlaffcameron@gmail.com"];
 
 // Cloudflare Worker that sends the Twilio SMS (see worker/ folder).
 // Update this after you deploy the worker.
@@ -55,7 +55,7 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export function isAdminUser(user) {
-  return !!user && user.email === ADMIN_EMAIL && user.emailVerified;
+  return !!user && ADMIN_EMAILS.includes(user.email) && user.emailVerified;
 }
 
 // Deterministic slot doc id — this is what makes double-booking impossible:

@@ -117,11 +117,11 @@ header{
   opacity:.9;pointer-events:none;
 }
 .hero-koru path{
-  fill:none;stroke:var(--gold);stroke-width:1.7;stroke-linecap:round;
-  stroke-dasharray:1066;stroke-dashoffset:1066;
+  fill:none;stroke:var(--gold);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:1156;stroke-dashoffset:1156;
   animation:draw 4.2s cubic-bezier(.4,0,.2,1) .3s forwards;
 }
-.hero-koru .inner{stroke:var(--fern);stroke-width:1;animation-delay:.9s;animation-duration:4.6s;stroke-dasharray:448;stroke-dashoffset:448}
+.hero-koru .inner{stroke:var(--fern);stroke-width:1.6;animation-delay:.9s;animation-duration:4.6s;stroke-dasharray:454;stroke-dashoffset:454}
 
 @keyframes draw{to{stroke-dashoffset:0}}
 .hero-content{position:relative;z-index:2;max-width:640px}
@@ -540,8 +540,8 @@ input[type=range]::-moz-range-thumb{
 .confirm-wrap{text-align:center;padding:14px 0 6px}
 .confirm-koru{width:74px;height:74px;margin:0 auto 22px}
 .confirm-koru path{
-  fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;
-  stroke-dasharray:144;stroke-dashoffset:144;
+  fill:none;stroke:var(--gold);stroke-width:2.6;stroke-linecap:round;
+  stroke-dasharray:155;stroke-dashoffset:155;
   animation:draw 1.6s cubic-bezier(.4,0,.2,1) .2s forwards;
 }
 .confirm-wrap h4{
